@@ -431,13 +431,15 @@ Repo target untuk proyek ini?
 **Jika user pilih A — repo baru:**
 - Tanya nama repo, visibility (`private` default kecuali user minta public), dan owner/org jika belum jelas.
 - Di prompt final, sertakan `<repo_strategy mode="new_repo">` yang menginstruksikan AI agent untuk create/clone repo baru sebelum implementasi.
-- Sertakan rule bahwa setelah implementasi selesai dan pushed, AI agent WAJIB menjalankan audit ulang terhadap repo hasil push menggunakan PRD + TDD + Prompt sebagai source of truth.
+- Di prompt final, WAJIB sertakan instruksi untuk meng-inject **Code Audit Pack** ke repo baru di path `skills/code-audit/` sebelum implementasi dimulai.
+- Sertakan rule bahwa setelah implementasi selesai dan pushed, AI agent WAJIB menjalankan audit ulang terhadap repo hasil push menggunakan PRD + TDD + Prompt + injected Code Audit Pack sebagai source of truth.
 
 **Jika user pilih B — repo existing:**
 - Minta URL repo + branch target jika belum diberikan.
 - Jika repo bisa diakses, lakukan audit ringan terlebih dahulu untuk mendeteksi stack, struktur, file penting, dan prompt existing.
 - Di prompt final, sertakan `<repo_strategy mode="existing_repo">` dengan repo URL, branch, dan instruksi `git pull` sebelum kerja.
-- Sertakan rule bahwa setelah perubahan di-commit/push, AI agent WAJIB audit ulang repo terbaru (`git pull`, inspect changed files, run verification) untuk memastikan implementasi sesuai PRD + TDD + Prompt.
+- Di prompt final, WAJIB sertakan instruksi untuk meng-inject **Code Audit Pack** ke repo existing di path `skills/code-audit/` sebelum implementasi dimulai. Jika folder sudah ada, update/overwrite file pack dari source terbaru.
+- Sertakan rule bahwa setelah perubahan di-commit/push, AI agent WAJIB audit ulang repo terbaru (`git pull`, inspect changed files, run verification) menggunakan PRD + TDD + Prompt + injected Code Audit Pack untuk memastikan implementasi sesuai.
 
 **Jika user pilih C — prompt-only:**
 - Tetap sertakan `<repo_strategy mode="deferred">` agar AI agent tahu repo belum ditentukan.
@@ -446,10 +448,11 @@ Repo target untuk proyek ini?
 **Audit ulang setelah push adalah mandatory untuk mode A dan B:**
 Tambahkan rule di `<system_constraints>` dan `<completion_gate>`:
 - Setelah kode di-push ke GitHub, clone/pull fresh copy dari remote.
-- Audit ulang fresh copy terhadap PRD, TDD, dan Prompt XML.
+- Pastikan `skills/code-audit/` ikut ter-commit dan berisi semua file Code Audit Pack.
+- Audit ulang fresh copy terhadap PRD, TDD, Prompt XML, dan `skills/code-audit/PROMPT.md` + `skills/code-audit/references/*.md`.
 - Buat compliance matrix: `requirement | implementation evidence | status | gaps`.
-- Jika ada mismatch, bug, missing requirement, mock/dummy data yang tidak diizinkan, atau verification failure: fix, push ulang, lalu ulangi audit dari fresh clone/pull.
-- Task baru boleh COMPLETE jika audit ulang fresh remote copy menyatakan semua requirement sesuai dan semua verification command exit 0.
+- Jika ada mismatch, bug, missing requirement, mock/dummy data yang tidak diizinkan, missing audit pack file, atau verification failure: fix, push ulang, lalu ulangi audit dari fresh clone/pull.
+- Task baru boleh COMPLETE jika audit ulang fresh remote copy menyatakan semua requirement sesuai, Code Audit Pack lengkap, dan semua verification command exit 0.
 
 ---
 
@@ -478,7 +481,9 @@ Setelah brainstorming selesai, WAJIB buat **3 artefak konsisten** dari konteks y
 - Tidak ada placeholder kosong seperti `[tbd]`, `[sesuaikan]`, `[nama]`
 - Tidak ada hardcoded local path; gunakan placeholder repo/path yang aman
 - `repo_strategy` sudah terisi sesuai jawaban user: `new_repo`, `existing_repo`, atau `deferred`
+- Untuk `new_repo`/`existing_repo`, prompt berisi instruksi inject Code Audit Pack ke `skills/code-audit/` sebelum implementasi
 - Untuk `new_repo`/`existing_repo`, post-push fresh remote audit rule dan completion gate sudah masuk ke Prompt XML
+- Completion gate memverifikasi `skills/code-audit/` lengkap di fresh remote copy
 
 Jika salah satu check gagal, revisi artefak terkait dulu sebelum tampilkan ringkasan ke user.
 
@@ -528,8 +533,23 @@ Berisi metadata proyek dan konteks teknis yang relevan:
   <repo_strategy mode="new_repo|existing_repo|deferred">
     <decision_source>Chosen during Fase 3.5 target repo question.</decision_source>
     <target_repo url="[repo url if known]" branch="[branch]" visibility="private|public" />
+    <code_audit_pack required="true" target_path="skills/code-audit">
+      <source_repo>https://github.com/rickicode/My-Skills</source_repo>
+      <source_path>skills/software-development/code-audit</source_path>
+      <required_files>
+        <file>README.md</file>
+        <file>SKILL.md</file>
+        <file>PROMPT.md</file>
+        <file>references/audit-dimensions.md</file>
+        <file>references/fix-patterns.md</file>
+        <file>references/severity-guide.md</file>
+      </required_files>
+      <instruction>
+        For new_repo and existing_repo modes, copy or curl every required file into the target repository at skills/code-audit/ before implementation starts. Commit and push these files with the project changes. Do not rely on external memory only.
+      </instruction>
+    </code_audit_pack>
     <post_push_audit required="true">
-      After implementation is pushed, clone or pull a fresh copy from remote, audit it against PRD + TDD + Prompt XML, produce a compliance matrix, fix any mismatch, push again, and repeat until fully compliant.
+      After implementation is pushed, clone or pull a fresh copy from remote, verify skills/code-audit/ contains every required Code Audit Pack file, then audit the repo against PRD + TDD + Prompt XML + skills/code-audit/PROMPT.md + skills/code-audit/references/*.md. Produce a compliance matrix, fix any mismatch, push again, and repeat until fully compliant.
     </post_push_audit>
   </repo_strategy>
   <repos>
@@ -688,14 +708,30 @@ Tambahkan rules ekstra jika ada constraint spesifik dari brainstorming.
   </rule>
 
   <rule id="12" priority="CRITICAL">
+    CODE AUDIT PACK INJECTION IS MANDATORY when repo_strategy is "new_repo" or "existing_repo".
+    Before implementing project tasks, create or update the target repository folder `skills/code-audit/` with every required file from:
+      https://github.com/rickicode/My-Skills/tree/main/skills/software-development/code-audit
+    Required files:
+      - skills/code-audit/README.md
+      - skills/code-audit/SKILL.md
+      - skills/code-audit/PROMPT.md
+      - skills/code-audit/references/audit-dimensions.md
+      - skills/code-audit/references/fix-patterns.md
+      - skills/code-audit/references/severity-guide.md
+    Read `skills/code-audit/PROMPT.md` and all `skills/code-audit/references/*.md` before auditing or fixing.
+    Do not continue if any required file is missing or empty.
+  </rule>
+
+  <rule id="13" priority="CRITICAL">
     POST-PUSH REMOTE AUDIT IS MANDATORY when repo_strategy is "new_repo" or "existing_repo".
     After pushing implementation changes to GitHub:
       1. Clone or pull a fresh copy from the remote repository.
-      2. Audit the fresh remote copy against the PRD, TDD, and this Prompt XML.
-      3. Produce a compliance matrix: requirement | implementation evidence | status | gaps.
-      4. Run the full verification suite from the fresh remote copy.
-      5. If any mismatch, missing requirement, unauthorized mock/dummy data, bug, or verification failure exists: fix it, push again, then repeat this rule from step 1.
-    Completion is forbidden until the fresh remote audit proves the pushed code matches the PRD, TDD, and Prompt XML.
+      2. Verify `skills/code-audit/` exists in the fresh remote copy and all required Code Audit Pack files are non-empty.
+      3. Audit the fresh remote copy against the PRD, TDD, this Prompt XML, and the injected Code Audit Pack (`skills/code-audit/PROMPT.md` + `skills/code-audit/references/*.md`).
+      4. Produce a compliance matrix: requirement | implementation evidence | status | gaps.
+      5. Run the full verification suite from the fresh remote copy.
+      6. If any mismatch, missing requirement, missing audit pack file, unauthorized mock/dummy data, bug, or verification failure exists: fix it, push again, then repeat this rule from step 1.
+    Completion is forbidden until the fresh remote audit proves the pushed code matches the PRD, TDD, Prompt XML, and injected Code Audit Pack.
   </rule>
 
   <!-- Tambahkan rules ekstra di sini jika ada constraint spesifik dari brainstorming -->
@@ -711,8 +747,9 @@ Tambahkan rules ekstra jika ada constraint spesifik dari brainstorming.
       ✓ bugs_found == 0
       ✓ All verification commands across all stacks → EXIT 0, errors == 0, warnings == 0
       ✓ Cross-stack API contracts verified and consistent (if applicable)
+      ✓ Code Audit Pack injected into `skills/code-audit/` with all required files when repo_strategy is new_repo or existing_repo
       ✓ Post-push fresh remote audit completed and compliant when repo_strategy is new_repo or existing_repo
-      ✓ Compliance matrix shows every PRD, TDD, and Prompt XML requirement as implemented with evidence
+      ✓ Compliance matrix shows every PRD, TDD, Prompt XML, and Code Audit Pack requirement as implemented with evidence
       ✓ Full verbatim output of every verification command displayed
 
     <!-- Tambah kondisi spesifik dari task jika ada -->
@@ -893,12 +930,13 @@ AI agent yang menerima prompt bisa langsung mulai implementasi tanpa setup dari 
 **Apa yang harus di-scaffold (minimal):**
 1. GitHub repo (private, via `gh repo create`)
 2. Root files: `README.md`, `.gitignore`, `.env.example`, `docker-compose.yml`
-3. Directory structure sesuai stack di prompt (`/backend`, `/frontend`, `/admin`, dll)
-4. Config files per stack: `go.mod`, `package.json`, `astro.config.mjs`, `vite.config.ts`, dll
-5. Entry point files: `main.go`, `index.astro`, `main.tsx` (minimal, cukup untuk build jalan)
-6. Database migration files (jika ada schema di prompt)
-7. Dockerfiles per service
-8. `.env.example` dengan semua variabel yang disebut di prompt
+3. **Code Audit Pack injected ke `skills/code-audit/`** berisi `README.md`, `SKILL.md`, `PROMPT.md`, dan semua `references/*.md` dari `rickicode/My-Skills/skills/software-development/code-audit`
+4. Directory structure sesuai stack di prompt (`/backend`, `/frontend`, `/admin`, dll)
+5. Config files per stack: `go.mod`, `package.json`, `astro.config.mjs`, `vite.config.ts`, dll
+6. Entry point files: `main.go`, `index.astro`, `main.tsx` (minimal, cukup untuk build jalan)
+7. Database migration files (jika ada schema di prompt)
+8. Dockerfiles per service
+9. `.env.example` dengan semua variabel yang disebut di prompt
 
 **Yang TIDAK perlu di-scaffold:**
 - Implementasi lengkap (itu tugas AI agent menerima prompt)
@@ -919,12 +957,14 @@ Monorepo structure for [Project Name]:
 
 Docker Compose setup for local development
 .env.example with all required variables documented
+Code Audit Pack injected under skills/code-audit/ for post-push audit/re-audit workflows
 ```
 
 **Flow:**
 1. Prompt uploaded → deliver link ke user
 2. User minta repo → scaffold + push
-3. Sertakan repo URL + prompt link bersamaan di final response
+3. Inject/update Code Audit Pack ke `skills/code-audit/`, commit, dan push bersama scaffold
+4. Sertakan repo URL + prompt link bersamaan di final response
 
 ---
 
