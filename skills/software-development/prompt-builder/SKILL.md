@@ -431,14 +431,14 @@ Repo target untuk proyek ini?
 **Jika user pilih A — repo baru:**
 - Tanya nama repo, visibility (`private` default kecuali user minta public), dan owner/org jika belum jelas.
 - Di prompt final, sertakan `<repo_strategy mode="new_repo">` yang menginstruksikan AI agent untuk create/clone repo baru sebelum implementasi.
-- Di prompt final, WAJIB sertakan instruksi untuk meng-inject **Code Audit Pack** ke repo baru di path `skills/code-audit/` sebelum implementasi dimulai.
+- Di prompt final, WAJIB sertakan instruksi untuk **copy/curl Code Audit Pack dari repo My-Skills** ke repo baru di path `skills/code-audit/` sebelum implementasi dimulai. Jangan suruh AI menulis ulang/mengarang isi skill dari nol.
 - Sertakan rule bahwa setelah implementasi selesai dan pushed, AI agent WAJIB menjalankan audit ulang terhadap repo hasil push menggunakan PRD + TDD + Prompt + injected Code Audit Pack sebagai source of truth.
 
 **Jika user pilih B — repo existing:**
 - Minta URL repo + branch target jika belum diberikan.
 - Jika repo bisa diakses, lakukan audit ringan terlebih dahulu untuk mendeteksi stack, struktur, file penting, dan prompt existing.
 - Di prompt final, sertakan `<repo_strategy mode="existing_repo">` dengan repo URL, branch, dan instruksi `git pull` sebelum kerja.
-- Di prompt final, WAJIB sertakan instruksi untuk meng-inject **Code Audit Pack** ke repo existing di path `skills/code-audit/` sebelum implementasi dimulai. Jika folder sudah ada, update/overwrite file pack dari source terbaru.
+- Di prompt final, WAJIB sertakan instruksi untuk **copy/curl Code Audit Pack dari repo My-Skills** ke repo existing di path `skills/code-audit/` sebelum implementasi dimulai. Jika folder sudah ada, update/overwrite file pack dari source terbaru. Jangan suruh AI menulis ulang/mengarang isi skill dari nol.
 - Sertakan rule bahwa setelah perubahan di-commit/push, AI agent WAJIB audit ulang repo terbaru (`git pull`, inspect changed files, run verification) menggunakan PRD + TDD + Prompt + injected Code Audit Pack untuk memastikan implementasi sesuai.
 
 **Jika user pilih C — prompt-only:**
@@ -544,8 +544,18 @@ Berisi metadata proyek dan konteks teknis yang relevan:
         <file>references/fix-patterns.md</file>
         <file>references/severity-guide.md</file>
       </required_files>
+      <install_commands>
+        mkdir -p skills/code-audit/references
+        BASE="https://raw.githubusercontent.com/rickicode/My-Skills/main/skills/software-development/code-audit"
+        curl -fsSL "$BASE/README.md" -o skills/code-audit/README.md
+        curl -fsSL "$BASE/SKILL.md" -o skills/code-audit/SKILL.md
+        curl -fsSL "$BASE/PROMPT.md" -o skills/code-audit/PROMPT.md
+        curl -fsSL "$BASE/references/audit-dimensions.md" -o skills/code-audit/references/audit-dimensions.md
+        curl -fsSL "$BASE/references/fix-patterns.md" -o skills/code-audit/references/fix-patterns.md
+        curl -fsSL "$BASE/references/severity-guide.md" -o skills/code-audit/references/severity-guide.md
+      </install_commands>
       <instruction>
-        For new_repo and existing_repo modes, copy or curl every required file into the target repository at skills/code-audit/ before implementation starts. Commit and push these files with the project changes. Do not rely on external memory only.
+        For new_repo and existing_repo modes, copy or curl every required file from My-Skills into the target repository at skills/code-audit/ before implementation starts. Do NOT generate these files manually and do NOT summarize them. Commit and push these copied files with the project changes. Do not rely on external memory only.
       </instruction>
     </code_audit_pack>
     <post_push_audit required="true">
@@ -709,8 +719,9 @@ Tambahkan rules ekstra jika ada constraint spesifik dari brainstorming.
 
   <rule id="12" priority="CRITICAL">
     CODE AUDIT PACK INJECTION IS MANDATORY when repo_strategy is "new_repo" or "existing_repo".
-    Before implementing project tasks, create or update the target repository folder `skills/code-audit/` with every required file from:
+    Before implementing project tasks, create or update the target repository folder `skills/code-audit/` by copying/curling every required file from:
       https://github.com/rickicode/My-Skills/tree/main/skills/software-development/code-audit
+    Do NOT write these files manually and do NOT create placeholders; the exact upstream file contents must be copied into the target repo.
     Required files:
       - skills/code-audit/README.md
       - skills/code-audit/SKILL.md
