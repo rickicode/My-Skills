@@ -9,6 +9,7 @@ This pack is agent-agnostic. It works for Claude Code, Codex CLI, Hermes Agent, 
 Do not use only `SKILL.md`. The full audit pack requires all files below:
 
 ```text
+code-audit-skill/README.md
 code-audit-skill/SKILL.md
 code-audit-skill/PROMPT.md
 code-audit-skill/references/audit-dimensions.md
@@ -26,12 +27,14 @@ Run this from the workspace where you will audit code:
 mkdir -p code-audit-skill/references
 BASE="https://raw.githubusercontent.com/rickicode/My-Skills/main/skills/software-development/code-audit"
 
+curl -fsSL "$BASE/README.md" -o code-audit-skill/README.md
 curl -fsSL "$BASE/SKILL.md" -o code-audit-skill/SKILL.md
 curl -fsSL "$BASE/PROMPT.md" -o code-audit-skill/PROMPT.md
 curl -fsSL "$BASE/references/audit-dimensions.md" -o code-audit-skill/references/audit-dimensions.md
 curl -fsSL "$BASE/references/fix-patterns.md" -o code-audit-skill/references/fix-patterns.md
 curl -fsSL "$BASE/references/severity-guide.md" -o code-audit-skill/references/severity-guide.md
 
+test -s code-audit-skill/README.md
 test -s code-audit-skill/SKILL.md
 test -s code-audit-skill/PROMPT.md
 test -s code-audit-skill/references/audit-dimensions.md
@@ -59,12 +62,14 @@ Install and use the Code Audit Pack before auditing or editing code.
 Run:
 mkdir -p code-audit-skill/references
 BASE="https://raw.githubusercontent.com/rickicode/My-Skills/main/skills/software-development/code-audit"
+curl -fsSL "$BASE/README.md" -o code-audit-skill/README.md
 curl -fsSL "$BASE/SKILL.md" -o code-audit-skill/SKILL.md
 curl -fsSL "$BASE/PROMPT.md" -o code-audit-skill/PROMPT.md
 curl -fsSL "$BASE/references/audit-dimensions.md" -o code-audit-skill/references/audit-dimensions.md
 curl -fsSL "$BASE/references/fix-patterns.md" -o code-audit-skill/references/fix-patterns.md
 curl -fsSL "$BASE/references/severity-guide.md" -o code-audit-skill/references/severity-guide.md
 
+test -s code-audit-skill/README.md && \
 test -s code-audit-skill/SKILL.md && \
 test -s code-audit-skill/PROMPT.md && \
 test -s code-audit-skill/references/audit-dimensions.md && \
@@ -90,6 +95,7 @@ If curl is unavailable or you prefer cloning:
 git clone https://github.com/rickicode/My-Skills.git /tmp/my-skills
 cp -a /tmp/my-skills/skills/software-development/code-audit ./code-audit-skill
 
+test -s code-audit-skill/README.md
 test -s code-audit-skill/SKILL.md
 test -s code-audit-skill/PROMPT.md
 test -s code-audit-skill/references/audit-dimensions.md
@@ -104,6 +110,7 @@ Then read `./code-audit-skill/PROMPT.md` and all `./code-audit-skill/references/
 If network access is blocked, the user must provide and save all files exactly like this:
 
 ```text
+code-audit-skill/README.md
 code-audit-skill/SKILL.md
 code-audit-skill/PROMPT.md
 code-audit-skill/references/audit-dimensions.md

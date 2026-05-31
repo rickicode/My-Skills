@@ -75,15 +75,20 @@ Kondisi yang memenuhi salah satu:
 ## Verdict Keseluruhan
 
 ### ✅ PRODUCTION READY
-- Zero temuan CRITICAL
-- Semua temuan HIGH sudah ada rencana fix
-- Kondisi ini disetujui untuk deploy
+- Zero temuan CRITICAL unresolved
+- Zero temuan HIGH unresolved
+- Verification relevan sudah dijalankan dan exit 0
+- Untuk audit+fix: re-audit setelah fix PASS tanpa blocker
 
 ### ⚠️ CONDITIONAL
-- Zero CRITICAL
-- Ada temuan HIGH — bisa deploy dengan komitmen fix dalam X hari
-- Semua temuan MEDIUM dan LOW sudah tercatat
+- Zero CRITICAL unresolved
+- Zero HIGH unresolved
+- Ada MEDIUM/LOW unresolved yang sudah dicatat, atau verification tertentu tidak bisa dijalankan karena blocker eksternal yang dijelaskan
+- Tidak boleh dipakai jika ada HIGH unresolved
 
 ### ❌ BLOCKED
-- Ada satu atau lebih temuan CRITICAL
-- Deploy tidak boleh dilakukan sampai semua CRITICAL selesai dan diverifikasi
+- Ada satu atau lebih CRITICAL unresolved
+- Ada satu atau lebih HIGH unresolved
+- Verification gagal
+- Required reference/audit pack file hilang
+- Kode yang perlu diaudit tidak bisa diakses/dibaca

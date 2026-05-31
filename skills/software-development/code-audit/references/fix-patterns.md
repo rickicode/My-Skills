@@ -319,10 +319,9 @@ async function getOrdersWithProducts(userId) {
   return orders;
 }
 
-// SESUDAH — batch / eager loading
+// SESUDAH — eager loading jika ORM mendukung
 // AUTOFIX: ganti N+1 dengan eager loading
 async function getOrdersWithProducts(userId) {
-  // Opsi 1: Eager loading (Sequelize)
   const orders = await Order.findAll({
     where: { userId },
     include: [{
@@ -331,21 +330,13 @@ async function getOrdersWithProducts(userId) {
     }]
   });
   return orders;
-
-  // Opsi 2: Manual batch jika ORM tidak support include bertingkat
-  // const orders = await Order.findAll({ where: { userId } });
-  // const orderIds = orders.map(o => o.id);
-  // const items = await OrderItem.findAll({ where: { orderId: orderIds } });
-  // const productIds = [...new Set(items.map(i => i.productId))];
-  // const products = await Product.findAll({ where: { id: productIds } });
-  // const productMap = Object.fromEntries(products.map(p => [p.id, p]));
-  // const itemMap = items.reduce((acc, item) => {
-  //   item.product = productMap[item.productId];
-  //   (acc[item.orderId] ??= []).push(item);
-  //   return acc;
-  // }, {});
-  // return orders.map(o => ({ ...o.toJSON(), items: itemMap[o.id] ?? [] }));
 }
+
+// Alternatif manual batch jika ORM tidak support include bertingkat:
+// 1. Fetch semua orders
+// 2. Ambil orderIds dan productIds unik
+// 3. Fetch OrderItem dan Product sekali per tabel
+// 4. Gabungkan hasil dengan map di memory
 ```
 
 ---

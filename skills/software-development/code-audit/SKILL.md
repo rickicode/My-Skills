@@ -8,17 +8,17 @@ description: >
   "pastikan sudah bener", "semua harus real", "perbaiki semua bug", "autofix",
   atau kalimat sejenis. Skill ini menangani tiga skenario: proyek baru dari PRD,
   rewrite dari referensi kode, dan proyek tanpa dokumen apapun (AI memetakan sendiri).
-  Setelah audit selesai, AI LANGSUNG memperbaiki semua temuan tanpa menunggu konfirmasi.
-  SELALU trigger skill ini untuk permintaan audit, validasi, atau perbaikan kode.
+  Skill ini membedakan audit-only dan audit+fix: review/cek hanya melaporkan, sedangkan fix/autofix/perbaiki menjalankan perbaikan, verifikasi, dan re-audit.
 ---
 
 # Code Audit & Autofix Skill
 
-Skill ini menjalankan dua fase secara berurutan dan otomatis:
-1. **AUDIT** — menemukan semua masalah berdasarkan sumber kebenaran yang jelas
-2. **AUTOFIX** — memperbaiki semua temuan langsung di kode, tanpa konfirmasi
+Skill ini menjalankan workflow audit kode dengan dua mode eksekusi:
 
-Tidak ada pause di antara kedua fase. Setelah laporan audit selesai, fix langsung dijalankan.
+1. **AUDIT_ONLY** — untuk permintaan review/cek/audit saja. Tidak mengubah file.
+2. **AUDIT_AND_FIX** — untuk permintaan fix/autofix/perbaiki/production-ready. Menjalankan audit → autofix → verifikasi → re-audit.
+
+Jangan mengedit file jika user hanya meminta review/cek/audit tanpa meminta fix.
 
 ---
 
@@ -48,8 +48,8 @@ Ada PRD / spesifikasi yang diberikan?
 ```
 
 **Aturan tanya**: Maksimal satu pertanyaan. Jika kode ada dan tidak ada indikasi
-rewrite maupun PRD → langsung MODE C tanpa tanya. Setelah pertanyaan dijawab →
-eksekusi langsung tanpa konfirmasi apapun.
+rewrite maupun PRD → langsung MODE C tanpa tanya. Jangan tanya PRD lagi jika konteks
+sudah cukup untuk Mode C.
 
 ---
 
@@ -114,6 +114,17 @@ Jalankan semua dimensi. Baca `references/audit-dimensions.md` untuk kriteria det
 
 ---
 
+## FASE 2.5 — Mode Eksekusi
+
+Tentukan execution mode dari wording user:
+
+- **AUDIT_ONLY**: user bilang audit, review, cek, analisa, cari bug, validasi — tanpa minta edit. Stop setelah laporan audit + action items.
+- **AUDIT_AND_FIX**: user bilang fix, autofix, perbaiki, langsung benerin, production ready, tidak boleh ada bug. Lanjut ke autofix, verification, dan re-audit.
+
+Jika ambiguous, default ke AUDIT_ONLY agar tidak mengubah file tanpa izin.
+
+---
+
 ## FASE 3 — Laporan Audit
 
 Cetak laporan dengan format WAJIB berikut sebelum memulai autofix:
@@ -167,13 +178,14 @@ Memulai fix...
 
 ---
 
-## FASE 4 — Autofix (langsung setelah laporan)
+## FASE 4 — Autofix (hanya AUDIT_AND_FIX)
 
-Setelah laporan dicetak, langsung eksekusi fix **tanpa jeda, tanpa konfirmasi**.
+Jika execution mode = AUDIT_ONLY, stop setelah laporan audit dan jangan edit file.
+Jika execution mode = AUDIT_AND_FIX, eksekusi fix setelah laporan.
 
 ### Aturan Autofix:
 
-**Yang WAJIB difix otomatis (SEMUA severity — CRITICAL, HIGH, MEDIUM, LOW):**
+**Yang WAJIB difix otomatis di mode AUDIT_AND_FIX (SEMUA severity — CRITICAL, HIGH, MEDIUM, LOW yang [PASTI] / [DUGAAN KUAT] dan aman):**
 - Stub/mock/placeholder → implementasi nyata
 - Try/catch missing → tambahkan dengan error handling yang proper
 - Logika bisnis salah → perbaiki kalkulasi/kondisi
@@ -231,6 +243,17 @@ CATATAN MANUAL (jika ada):
 Status akhir: [SIAP DEPLOY ✅ / PERLU REVIEW MANUAL ⚠️]
 ═══════════════════════════════════════════════════
 ```
+
+---
+
+## FASE 5 — Verification dan Re-audit
+
+Untuk AUDIT_AND_FIX:
+1. Jalankan test/typecheck/build/lint sesuai tooling repo nyata.
+2. Tampilkan command, exit code, dan ringkasan output nyata.
+3. Jika gagal, fix penyebabnya lalu ulangi verifikasi.
+4. Re-audit file/domain yang berubah menggunakan D1-D9.
+5. Status akhir hanya boleh `SIAP DEPLOY` jika tidak ada CRITICAL/HIGH unresolved dan verification pass.
 
 ---
 
