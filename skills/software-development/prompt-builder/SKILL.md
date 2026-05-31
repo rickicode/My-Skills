@@ -410,9 +410,46 @@ Konteks sudah cukup untuk mulai membuat prompt?
     C. Saya mau tambah scope
 ```
 
-Jika pengguna memilih A → lanjut ke Fase 4 (generate prompt).
+Jika pengguna memilih A → lanjut ke Fase 3.5 (target repo), lalu Fase 4.
 Jika pengguna memilih B → kembali ke Fase 2.
 Jika pengguna memilih C → tanyakan scope tambahan, lalu kembali ke Fase 2.
+
+---
+
+### Fase 3.5 — Wajib Tanya Target Repo
+
+Sebelum generate PRD + TDD + Prompt, WAJIB tanya apakah output prompt ini untuk:
+
+```
+Repo target untuk proyek ini?
+    A. Buat repo GitHub baru untuk proyek ini ✅
+    B. Push / implement ke repo GitHub yang sudah ada
+    C. Prompt-only dulu, repo nanti
+    D. Tulis sendiri
+```
+
+**Jika user pilih A — repo baru:**
+- Tanya nama repo, visibility (`private` default kecuali user minta public), dan owner/org jika belum jelas.
+- Di prompt final, sertakan `<repo_strategy mode="new_repo">` yang menginstruksikan AI agent untuk create/clone repo baru sebelum implementasi.
+- Sertakan rule bahwa setelah implementasi selesai dan pushed, AI agent WAJIB menjalankan audit ulang terhadap repo hasil push menggunakan PRD + TDD + Prompt sebagai source of truth.
+
+**Jika user pilih B — repo existing:**
+- Minta URL repo + branch target jika belum diberikan.
+- Jika repo bisa diakses, lakukan audit ringan terlebih dahulu untuk mendeteksi stack, struktur, file penting, dan prompt existing.
+- Di prompt final, sertakan `<repo_strategy mode="existing_repo">` dengan repo URL, branch, dan instruksi `git pull` sebelum kerja.
+- Sertakan rule bahwa setelah perubahan di-commit/push, AI agent WAJIB audit ulang repo terbaru (`git pull`, inspect changed files, run verification) untuk memastikan implementasi sesuai PRD + TDD + Prompt.
+
+**Jika user pilih C — prompt-only:**
+- Tetap sertakan `<repo_strategy mode="deferred">` agar AI agent tahu repo belum ditentukan.
+- Prompt final harus meminta AI agent menunggu repo URL atau membuat repo baru saat eksekusi, bukan mengasumsikan path lokal.
+
+**Audit ulang setelah push adalah mandatory untuk mode A dan B:**
+Tambahkan rule di `<system_constraints>` dan `<completion_gate>`:
+- Setelah kode di-push ke GitHub, clone/pull fresh copy dari remote.
+- Audit ulang fresh copy terhadap PRD, TDD, dan Prompt XML.
+- Buat compliance matrix: `requirement | implementation evidence | status | gaps`.
+- Jika ada mismatch, bug, missing requirement, mock/dummy data yang tidak diizinkan, atau verification failure: fix, push ulang, lalu ulangi audit dari fresh clone/pull.
+- Task baru boleh COMPLETE jika audit ulang fresh remote copy menyatakan semua requirement sesuai dan semua verification command exit 0.
 
 ---
 
@@ -440,6 +477,8 @@ Setelah brainstorming selesai, WAJIB buat **3 artefak konsisten** dari konteks y
 - Verification plan di TDD selaras dengan Rule 10 di prompt
 - Tidak ada placeholder kosong seperti `[tbd]`, `[sesuaikan]`, `[nama]`
 - Tidak ada hardcoded local path; gunakan placeholder repo/path yang aman
+- `repo_strategy` sudah terisi sesuai jawaban user: `new_repo`, `existing_repo`, atau `deferred`
+- Untuk `new_repo`/`existing_repo`, post-push fresh remote audit rule dan completion gate sudah masuk ke Prompt XML
 
 Jika salah satu check gagal, revisi artefak terkait dulu sebelum tampilkan ringkasan ke user.
 
@@ -486,10 +525,17 @@ Berisi metadata proyek dan konteks teknis yang relevan:
   <project name="[nama proyek]" />
   <scope>[deskripsi singkat scope task]</scope>
   <execution_mode>autonomous</execution_mode>
+  <repo_strategy mode="new_repo|existing_repo|deferred">
+    <decision_source>Chosen during Fase 3.5 target repo question.</decision_source>
+    <target_repo url="[repo url if known]" branch="[branch]" visibility="private|public" />
+    <post_push_audit required="true">
+      After implementation is pushed, clone or pull a fresh copy from remote, audit it against PRD + TDD + Prompt XML, produce a compliance matrix, fix any mismatch, push again, and repeat until fully compliant.
+    </post_push_audit>
+  </repo_strategy>
   <repos>
-    <!-- Sertakan hanya jika task melibatkan multiple repos -->
-    <repo name="[nama]" url="[url]" access="private|public" branch="[branch]" />
-    <repo name="[nama]" url="[url]" access="private|public" branch="[branch]" />
+    <!-- Sertakan hanya jika task melibatkan multiple repos atau reference repo -->
+    <repo name="[nama]" url="[url]" access="private|public" branch="[branch]" purpose="target|reference" />
+    <repo name="[nama]" url="[url]" access="private|public" branch="[branch]" purpose="target|reference" />
   </repos>
   <stack>
     <!-- Sesuaikan dengan stack yang ditemukan saat brainstorming -->
@@ -641,6 +687,17 @@ Tambahkan rules ekstra jika ada constraint spesifik dari brainstorming.
     Any mismatch is a bug and must be fixed before proceeding.
   </rule>
 
+  <rule id="12" priority="CRITICAL">
+    POST-PUSH REMOTE AUDIT IS MANDATORY when repo_strategy is "new_repo" or "existing_repo".
+    After pushing implementation changes to GitHub:
+      1. Clone or pull a fresh copy from the remote repository.
+      2. Audit the fresh remote copy against the PRD, TDD, and this Prompt XML.
+      3. Produce a compliance matrix: requirement | implementation evidence | status | gaps.
+      4. Run the full verification suite from the fresh remote copy.
+      5. If any mismatch, missing requirement, unauthorized mock/dummy data, bug, or verification failure exists: fix it, push again, then repeat this rule from step 1.
+    Completion is forbidden until the fresh remote audit proves the pushed code matches the PRD, TDD, and Prompt XML.
+  </rule>
+
   <!-- Tambahkan rules ekstra di sini jika ada constraint spesifik dari brainstorming -->
   <!-- Contoh: "jangan ubah logika bisnis X", "jangan sentuh file Y", dll -->
 
@@ -654,6 +711,8 @@ Tambahkan rules ekstra jika ada constraint spesifik dari brainstorming.
       ✓ bugs_found == 0
       ✓ All verification commands across all stacks → EXIT 0, errors == 0, warnings == 0
       ✓ Cross-stack API contracts verified and consistent (if applicable)
+      ✓ Post-push fresh remote audit completed and compliant when repo_strategy is new_repo or existing_repo
+      ✓ Compliance matrix shows every PRD, TDD, and Prompt XML requirement as implemented with evidence
       ✓ Full verbatim output of every verification command displayed
 
     <!-- Tambah kondisi spesifik dari task jika ada -->
