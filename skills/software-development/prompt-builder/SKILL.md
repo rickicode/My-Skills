@@ -423,7 +423,7 @@ Sebelum generate PRD + TDD + Prompt, WAJIB tanya apakah output prompt ini untuk:
 ```
 Repo target untuk proyek ini?
     A. Buat repo GitHub baru untuk proyek ini ✅
-    B. Push / implement ke repo GitHub yang sudah ada
+    B. Implement ke repo GitHub existing — saya akan kasih URL repo + branch
     C. Prompt-only dulu, repo nanti
     D. Tulis sendiri
 ```
